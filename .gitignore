@@ -1,0 +1,70 @@
+# ─── Dependencies ───────────────────────────────────────────────────────────
+node_modules/
+server/node_modules/
+client/node_modules/
+
+# ─── Environment & secrets (never commit) ───────────────────────────────────
+.env
+.env.*
+!.env.example
+server/.env
+client/.env
+client/.env.local
+client/.env.*.local
+
+# ─── Build output ───────────────────────────────────────────────────────────
+client/dist/
+dist/
+build/
+out/
+.vite/
+
+# ─── Logs ───────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ─── Testing & coverage ─────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ─── Caches ─────────────────────────────────────────────────────────────────
+.cache/
+.parcel-cache/
+.turbo/
+.eslintcache
+*.tsbuildinfo
+
+# ─── OS files ───────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ─── Editors & IDEs ─────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+# ─── Cursor / local tooling ─────────────────────────────────────────────────
+.cursor/
+
+# ─── Misc ───────────────────────────────────────────────────────────────────
+*.local
+.temp/
+tmp/

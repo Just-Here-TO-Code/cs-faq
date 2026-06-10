@@ -1,0 +1,29 @@
+{
+  "name": "crowdfaq",
+  "version": "1.0.0",
+  "description": "A community-driven FAQ platform built with the MERN stack",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "postinstall": "npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently --names \"server,client\" --prefix-colors \"blue,green\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "seed": "npm run seed --prefix server",
+    "build": "npm run build --prefix client",
+    "start": "npm run start --prefix server"
+  },
+  "keywords": [
+    "mern",
+    "faq",
+    "react",
+    "express",
+    "mongodb",
+    "crowdsourcing",
+    "jwt"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
