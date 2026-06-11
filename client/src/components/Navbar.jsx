@@ -49,6 +49,7 @@ export default function Navbar() {
             <NavLink to="/" end className={linkClass}>FAQ</NavLink>
             <NavLink to="/ask" className={linkClass}>Ask Question</NavLink>
             <NavLink to="/community" className={linkClass}>Community</NavLink>
+            <NavLink to="/leaderboard" className={linkClass}>🏆 Leaderboard</NavLink>
           </nav>
 
           {/* Right actions */}
@@ -64,14 +65,16 @@ export default function Navbar() {
             </button>
             {user ? (
               <div className="hidden sm:flex items-center gap-2">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700/60">
-                  <div className="w-7 h-7 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-bold">
+                <Link to="/profile" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700/60 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-violet-600 text-white flex items-center justify-center text-xs font-bold">
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200 max-w-[100px] truncate">{user.name}</span>
-                </div>
-                <button onClick={logout} className="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 px-2 py-1 transition-colors">
-                  Log out
+                </Link>
+                <button onClick={logout} className="text-sm font-medium text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 px-2 py-1 transition-colors" title="Log out">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                  </svg>
                 </button>
               </div>
             ) : (
@@ -103,7 +106,7 @@ export default function Navbar() {
         {/* Mobile menu */}
         {menuOpen && (
           <div className="sm:hidden border-t border-slate-100 dark:border-slate-700 py-3 space-y-1 animate-fade-in">
-            {[['/', 'FAQ', true], ['/ask', 'Ask Question', false], ['/community', 'Community', false]].map(([to, label, end]) => (
+            {[['/', 'FAQ', true], ['/ask', 'Ask Question', false], ['/community', 'Community', false], ['/leaderboard', '🏆 Leaderboard', false]].map(([to, label, end]) => (
               <NavLink key={to} to={user || to !== '/ask' ? to : '/auth'} end={end || undefined}
                 state={!user && to === '/ask' ? { from: '/ask' } : undefined}
                 onClick={() => setMenuOpen(false)}
@@ -112,10 +115,16 @@ export default function Navbar() {
               </NavLink>
             ))}
             {user ? (
-              <button onClick={() => { logout(); setMenuOpen(false) }}
-                className="block w-full text-left px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium transition-colors">
-                Log out ({user.name})
-              </button>
+              <>
+                <NavLink to="/profile" onClick={() => setMenuOpen(false)}
+                  className="block px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-primary-50 dark:hover:bg-slate-700 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors">
+                  👤 My Profile
+                </NavLink>
+                <button onClick={() => { logout(); setMenuOpen(false) }}
+                  className="block w-full text-left px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium transition-colors">
+                  Sign out ({user.name})
+                </button>
+              </>
             ) : (
               <NavLink to="/auth" onClick={() => setMenuOpen(false)}
                 className="block px-3 py-2 rounded-lg text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-slate-700 font-semibold transition-colors">

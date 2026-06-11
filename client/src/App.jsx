@@ -9,6 +9,8 @@ import AskQuestionPage from './pages/AskQuestionPage'
 import CommunityPage from './pages/CommunityPage'
 import QuestionDetailPage from './pages/QuestionDetailPage'
 import AuthPage from './pages/AuthPage'
+import LeaderboardPage from './pages/LeaderboardPage'
+import ProfilePage from './pages/ProfilePage'
 
 export default function App() {
   return (
@@ -19,11 +21,13 @@ export default function App() {
             <Navbar />
             <main className="flex-1">
               <Routes>
-                <Route path="/" element={<FAQPage />} />
-                <Route path="/auth" element={<AuthPage />} />
-                <Route path="/ask" element={<ProtectedRoute><AskQuestionPage /></ProtectedRoute>} />
-                <Route path="/community" element={<CommunityPage />} />
+                <Route path="/"              element={<FAQPage />} />
+                <Route path="/auth"          element={<AuthPage />} />
+                <Route path="/ask"           element={<ProtectedRoute><AskQuestionPage /></ProtectedRoute>} />
+                <Route path="/community"     element={<CommunityPage />} />
                 <Route path="/community/:id" element={<QuestionDetailPage />} />
+                <Route path="/leaderboard"   element={<LeaderboardPage />} />
+                <Route path="/profile"       element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               </Routes>
             </main>
             <Footer />

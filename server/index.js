@@ -3,10 +3,12 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
-const faqRoutes = require('./routes/faqs');
+const faqRoutes      = require('./routes/faqs');
 const questionRoutes = require('./routes/questions');
-const answerRoutes = require('./routes/answers');
-const authRoutes = require('./routes/auth');
+const answerRoutes   = require('./routes/answers');
+const authRoutes     = require('./routes/auth');
+const userRoutes     = require('./routes/users');
+const suggestRoutes  = require('./routes/suggest');
 
 const app = express();
 
@@ -15,10 +17,12 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/faqs', faqRoutes);
+app.use('/api/auth',     authRoutes);
+app.use('/api/faqs',     faqRoutes);
 app.use('/api/questions', questionRoutes);
-app.use('/api/answers', answerRoutes);
+app.use('/api/answers',  answerRoutes);
+app.use('/api/users',    userRoutes);
+app.use('/api/suggest',  suggestRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

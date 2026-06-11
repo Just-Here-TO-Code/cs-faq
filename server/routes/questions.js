@@ -2,7 +2,18 @@ const express  = require('express');
 const router   = express.Router();
 const Question = require('../models/Question');
 const FAQ      = require('../models/FAQ');
+const User     = require('../models/User');
 const { requireAuth } = require('../middleware/auth');
+
+async function awardPoints(userId, delta, statField) {
+  if (!userId) return;
+  try {
+    const inc = { points: delta };
+    if (statField) inc[`stats.${statField}`] = 1;
+    const user = await User.findByIdAndUpdate(userId, { $inc: inc }, { new: true });
+    if (user) { user.recalcLevel(); await user.save(); }
+  } catch { /* silent */ }
+}
 
 const SPAM_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
@@ -89,6 +100,10 @@ router.post('/', requireAuth, async (req, res) => {
       category: category || 'General', tags: parsedTags, status: 'pending',
     });
     const saved = await question.save();
+
+    // Award 2 points for asking a question
+    await awardPoints(req.user._id, 2, 'questionsAsked');
+
     res.status(201).json(saved);
   } catch (err) {
     res.status(500).json({ error: err.message });

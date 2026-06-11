@@ -39,6 +39,37 @@ router.get('/categories', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/faqs/related?category=<cat>&tags=<tag1,tag2>&exclude=<id>
+ * "People like you also asked" — finds FAQs in the same category / sharing tags.
+ * Returns up to 4 results, excluding the specified FAQ id.
+ */
+router.get('/related', async (req, res) => {
+  try {
+    const { category, tags, exclude } = req.query;
+    const tagList = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+    const query = { status: 'approved' };
+    if (exclude) query._id = { $ne: exclude };
+
+    // Build OR: same category OR any matching tag
+    const orClauses = [];
+    if (category && category !== 'General') orClauses.push({ category });
+    if (tagList.length) orClauses.push({ tags: { $in: tagList } });
+
+    if (orClauses.length) query.$or = orClauses;
+
+    const related = await FAQ.find(query)
+      .sort({ helpfulYes: -1, views: -1 })
+      .limit(4)
+      .select('question category tags helpfulYes views');
+
+    res.json(related);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/faqs/:id  — single FAQ + increment views
 router.get('/:id', async (req, res) => {
   try {

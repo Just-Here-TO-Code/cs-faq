@@ -1,12 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const FAQ  = require('../models/FAQ');
 const { signToken, requireAuth } = require('../middleware/auth');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function publicUser(user) {
-  return { id: user._id, name: user.name, email: user.email, createdAt: user.createdAt };
+  return {
+    id:        user._id,
+    name:      user.name,
+    email:     user.email,
+    points:    user.points   || 0,
+    level:     user.level    || 'Beginner',
+    stats:     user.stats    || {},
+    savedFAQs: user.savedFAQs || [],
+    createdAt: user.createdAt,
+  };
 }
 
 // POST /api/auth/register
@@ -57,9 +67,40 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /api/auth/me
-router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: publicUser(req.user) });
+// GET /api/auth/me — full profile with resolved saved FAQs
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate('savedFAQs');
+    res.json({ user: { ...publicUser(user), savedFAQs: user.savedFAQs || [] } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/save-faq/:faqId — toggle save/unsave
+router.post('/save-faq/:faqId', requireAuth, async (req, res) => {
+  try {
+    const { faqId } = req.params;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const idx = user.savedFAQs.findIndex(id => id.toString() === faqId);
+    let saved;
+    if (idx === -1) {
+      // Verify FAQ exists
+      const faq = await FAQ.findById(faqId);
+      if (!faq) return res.status(404).json({ error: 'FAQ not found' });
+      user.savedFAQs.push(faqId);
+      saved = true;
+    } else {
+      user.savedFAQs.splice(idx, 1);
+      saved = false;
+    }
+    await user.save();
+    res.json({ saved, savedFAQs: user.savedFAQs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

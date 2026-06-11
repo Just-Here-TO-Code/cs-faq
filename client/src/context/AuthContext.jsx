@@ -1,11 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { login as apiLogin, register as apiRegister, fetchMe, setAuthToken } from '../services/api'
+import { login as apiLogin, register as apiRegister, fetchMe, setAuthToken, toggleSaveFAQ } from '../services/api'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'crowdfaq-token'
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
+  const [user,    setUser]    = useState(null)
   const [loading, setLoading] = useState(true)
 
   const logout = useCallback(() => {
@@ -22,10 +22,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY)
-    if (!token) {
-      setLoading(false)
-      return
-    }
+    if (!token) { setLoading(false); return }
     setAuthToken(token)
     fetchMe()
       .then(data => setUser(data.user))
@@ -45,8 +42,28 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
+  /** Toggle save/unsave FAQ. Updates local user state. Returns { saved: bool } */
+  async function saveFAQ(faqId) {
+    if (!user) return { saved: false }
+    const result = await toggleSaveFAQ(faqId)
+    // Update the savedFAQs list in local state
+    setUser(u => ({
+      ...u,
+      savedFAQs: result.savedFAQs,
+    }))
+    return result
+  }
+
+  /** Check if a FAQ is saved by current user */
+  function isFAQSaved(faqId) {
+    if (!user?.savedFAQs) return false
+    return user.savedFAQs.some(id =>
+      (typeof id === 'object' ? id._id || id : id).toString() === faqId.toString()
+    )
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, saveFAQ, isFAQSaved, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   )

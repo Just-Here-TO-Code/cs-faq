@@ -11,26 +11,37 @@ export function setAuthToken(token) {
 }
 
 // Auth
-export const register = (data) => api.post('/auth/register', data).then(r => r.data)
-export const login    = (data) => api.post('/auth/login', data).then(r => r.data)
-export const fetchMe  = ()     => api.get('/auth/me').then(r => r.data)
+export const register    = (data)  => api.post('/auth/register', data).then(r => r.data)
+export const login       = (data)  => api.post('/auth/login',    data).then(r => r.data)
+export const fetchMe     = ()      => api.get('/auth/me').then(r => r.data)
+export const toggleSaveFAQ = (faqId) => api.post(`/auth/save-faq/${faqId}`).then(r => r.data)
 
 // FAQs
-export const fetchFAQs = (params = {}) => api.get('/faqs', { params }).then(r => r.data)
-export const fetchFAQCategories = () => api.get('/faqs/categories').then(r => r.data)
-export const voteFAQ = (id, vote) => api.post(`/faqs/${id}/vote`, { vote }).then(r => r.data)
+export const fetchFAQs          = (params = {}) => api.get('/faqs', { params }).then(r => r.data)
+export const fetchFAQCategories = ()            => api.get('/faqs/categories').then(r => r.data)
+export const voteFAQ            = (id, vote)   => api.post(`/faqs/${id}/vote`, { vote }).then(r => r.data)
+export const fetchRelatedFAQs   = (params = {}) => api.get('/faqs/related', { params }).then(r => r.data)
 
 // Questions
-export const fetchQuestions = (params = {}) => api.get('/questions', { params }).then(r => r.data)
-export const fetchQuestion  = (id) => api.get(`/questions/${id}`).then(r => r.data)
-export const fetchSimilar   = (q)  => api.get('/questions/similar', { params: { q } }).then(r => r.data)
-export const createQuestion = (data) => api.post('/questions', data).then(r => r.data)
-export const updateQuestionStatus = (id, status) =>
+export const fetchQuestions       = (params = {}) => api.get('/questions', { params }).then(r => r.data)
+export const fetchQuestion        = (id)           => api.get(`/questions/${id}`).then(r => r.data)
+export const fetchSimilar         = (q)            => api.get('/questions/similar', { params: { q } }).then(r => r.data)
+export const createQuestion       = (data)         => api.post('/questions', data).then(r => r.data)
+export const updateQuestionStatus = (id, status)   =>
   api.patch(`/questions/${id}/status`, { status }).then(r => r.data)
 
 // Answers
-export const fetchAnswers = (questionId, params = {}) =>
+export const fetchAnswers       = (questionId, params = {}) =>
   api.get(`/answers/${questionId}`, { params }).then(r => r.data)
-export const createAnswer = (data) => api.post('/answers', data).then(r => r.data)
+export const createAnswer       = (data)      => api.post('/answers',          data).then(r => r.data)
 export const updateAnswerStatus = (id, status) =>
   api.patch(`/answers/${id}/status`, { status }).then(r => r.data)
+export const upvoteAnswer = (id) => api.post(`/answers/${id}/upvote`).then(r => r.data)
+
+// AI Suggestion
+export const fetchSuggestion = (q) => api.get('/suggest', { params: { q } }).then(r => r.data)
+
+// Users / Leaderboard / Profile
+export const fetchLeaderboard  = (limit = 20) => api.get('/users/leaderboard', { params: { limit } }).then(r => r.data)
+export const fetchUserProfile  = (id)         => api.get(`/users/${id}/profile`).then(r => r.data)
+export const fetchMyProfile    = ()           => api.get('/users/me/profile').then(r => r.data)

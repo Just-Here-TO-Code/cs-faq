@@ -376,13 +376,172 @@ These features were explicitly excluded from the MVP. If the user asks to add th
 ✅ **DONE** — Sort by latest/helpful/views
 ✅ **DONE** — User authentication (JWT, User model, login/signup page, protected POST routes)
 
+✅ **DONE** — AI-Powered Suggested Answers (keyword-overlap matching against FAQ corpus)
+✅ **DONE** — Reputation system (points, levels, leaderboard, upvotes)
+
 **Still Remaining:**
 1. **Pagination** — Add `?page=` and `?limit=` to list endpoints; add pagination UI
 2. **Admin panel** — Dedicated protected route; role-based moderation; manage FAQs directly (CRUD on FAQ collection)
 3. **Email notifications** — Nodemailer; notify question author when answer is posted
 4. **Rich text editor** — Markdown support for answers (e.g., react-markdown + remark)
-5. **AI answer suggestions** — Could use OpenAI API to suggest answers from existing FAQ
-6. **Delete functionality** — Delete questions/answers (currently only status change is supported)
+5. **Delete functionality** — Delete questions/answers (currently only status change is supported)
+
+---
+
+### Session 6 — 2026-06-11 (AI Suggestions + Reputation System)
+
+**User Request**: Add AI-powered suggested answers for admins and a reputation/leaderboard system.
+
+#### Feature 1: AI-Powered Suggested Answers
+
+**How it works** (no external API key required):
+- When a logged-in user opens the question detail page, an **🤖 AI Suggest** collapsible panel appears above the answer textarea
+- On first expand, it calls `GET /api/suggest?q=<title + description>` which:
+  1. Tokenises the question into significant keywords (filters stop words)
+  2. Loads all approved FAQs from MongoDB (capped at 200)
+  3. Scores each FAQ by `hits / totalKeywords` (word-overlap ratio)
+  4. Returns the best match if `score >= 0.25` (25% confidence threshold)
+- The panel shows: confidence bar, suggested text, source FAQ citation
+- "Use this suggestion" button pre-fills the answer textarea; admin can edit before submitting
+
+**Files changed:**
+- `server/routes/suggest.js` ← **NEW** — keyword overlap scoring engine
+- `server/index.js` ← mount `/api/suggest`
+- `client/src/services/api.js` ← `fetchSuggestion(q)`
+- `client/src/pages/QuestionDetailPage.jsx` ← `AISuggestionPanel` component (collapsible, confidence bar, pre-fill)
+
+#### Feature 2: Reputation System
+
+**Points schema (User model):**
+| Action | Points | Stat field |
+|--------|--------|------------|
+| Ask a question | +2 | `questionsAsked` |
+| Submit an answer | +5 | `answersGiven` |
+| Answer gets approved | +15 | `answersApproved` |
+| Receive upvote | +10 | `upvotesReceived` |
+
+**Levels** auto-recalculated on every point award:
+- 🌱 Beginner: 0–49 pts
+- ⭐ Contributor: 50–199 pts
+- 🏆 Expert: 200+ pts
+
+**Upvote system:**
+- Toggle upvote on any answer (`POST /api/answers/:id/upvote`)
+- Tracked per voter email (`upvotedBy[]` array on Answer model) to prevent double-voting
+- Upvote button appears on each answer card; fills solid when voted; shows count
+- Requires auth; disabled/grayed for guests with tooltip
+
+**Leaderboard:**
+- `GET /api/users/leaderboard` — top contributors sorted by points (public endpoint)
+- `LeaderboardPage.jsx` at `/leaderboard` — gradient hero with level legend, ranked cards with progress bars, stats row, points-system explanation
+- Medal icons for top 3 (🥇🥈🥉)
+- Navbar updated with "🏆 Leaderboard" link (desktop + mobile)
+
+**Files created/modified in Session 6:**
+```
+server/models/User.js              ← added points, level, stats fields + recalcLevel()
+server/models/Answer.js            ← added authorId, upvotes, upvotedBy
+server/routes/answers.js           ← awardPoints helper, upvote endpoint, approval bonus
+server/routes/questions.js         ← award 2 pts on question submit
+server/routes/suggest.js           ← NEW: AI suggestion engine
+server/routes/users.js             ← NEW: leaderboard + public profile endpoints
+server/index.js                    ← mount /api/users and /api/suggest
+client/src/services/api.js         ← upvoteAnswer, fetchSuggestion, fetchLeaderboard, fetchUserProfile
+client/src/pages/QuestionDetailPage.jsx  ← AISuggestionPanel + upvote buttons
+client/src/pages/LeaderboardPage.jsx     ← NEW: full leaderboard UI
+client/src/App.jsx                 ← /leaderboard route
+client/src/components/Navbar.jsx   ← 🏆 Leaderboard nav link
+README.md                          ← full rewrite with all features documented
+CONTEXT.md                         ← this update
+```
+
+---
+
+### Session 7 — 2026-06-11 (Profile Page, Save FAQs, Confidence Scores, People-like-you, UI Overhaul)
+
+**User Request**: Profile page, save-FAQ heart button, AI confidence scores on answers, "People like you asked" sidebar, and a UI modernisation pass.
+
+#### Feature 1: User Profile Page (`/profile`)
+
+- `GET /api/users/me/profile` — returns full user data + populated savedFAQs + last 10 questions + last 10 answers (with `questionId.title` populated)
+- `ProfilePage.jsx` — rich profile with:
+  - Gradient banner (colour matches user level)
+  - Gradient avatar with initial
+  - Level progress bar showing pts to next level
+  - 4 `stat-card` tiles: Questions Asked, Answers Given, Answers Approved, Upvotes Received
+  - **3 tabs**: Questions / Answers / Saved FAQs — each with empty-state CTAs
+  - Answers tab shows confidence score bars
+  - Sign out button
+- Navbar: user avatar chip is now a clickable `<Link to="/profile">` with gradient background
+
+#### Feature 2: Save FAQs (Heart button)
+
+- `User.savedFAQs: [ObjectId ref FAQ]` added to User model
+- `POST /api/auth/save-faq/:faqId` — toggles save/unsave; returns `{ saved: bool, savedFAQs: [...] }`
+- `GET /api/auth/me` — now populates `savedFAQs` array
+- `AuthContext.saveFAQ(faqId)` — calls API, updates `user.savedFAQs` locally
+- `AuthContext.isFAQSaved(faqId)` — checks if an FAQ id is in `user.savedFAQs`
+- `AccordionItem` — heart icon appears when logged in; filled/rose when saved, hollow/grey otherwise
+- Saving state (`saving`) prevents double-click; propagation stopped so click doesn't toggle accordion
+
+#### Feature 3: AI Confidence Scores on Answers
+
+- `Answer.confidence: Number (0–100)` added to Answer model
+- `computeConfidence(title, desc, body)` in `answers.js` — runs at submit time:
+  - Blends **60% question keyword coverage** + **40% FAQ corpus alignment**
+  - Capped at 100, stored on the Answer document
+- **Question Detail page**: confidence bar shown under each answer body (green ≥70, amber ≥40, red <40)
+- **Profile page Answers tab**: same colour-coded bar shown for each answer
+
+#### Feature 4: "People Like You Also Asked" Sidebar
+
+- `GET /api/faqs/related?category=<>&tags=<>&exclude=<>` — returns up to 4 FAQs in same category / sharing tags, sorted by helpful votes + views
+- `FAQPage` two-column layout (main + sidebar) on desktop; sidebar has:
+  - `RelatedFAQs` component — renders when any FAQ is expanded (tracked via `openFaq` state)
+  - Login CTA card for guests to encourage saving FAQs
+
+#### Feature 5: UI Modernisation
+
+- `index.css` — `btn-primary` now gradient + shadow-glow; `card-hover` with lift; `stat-card`, `confidence-bar-track/fill`, `glow-primary`, `animate-slide-up`, `no-scrollbar`
+- `AccordionItem` — gradient number badge (rounded-xl), gradient chevron background, modern vote buttons with shadow
+- `FAQPage` — hero has decorative blur blobs, quick-stats count bar, gradient category pills, two-column layout
+- Navbar user chip — gradient rounded-lg avatar, icon-only logout button with tooltip
+
+**Files created/modified in Session 7:**
+```
+server/models/User.js              ← added savedFAQs field
+server/models/Answer.js            ← added confidence field
+server/routes/auth.js              ← publicUser with reputation, /save-faq/:faqId, /me with populate
+server/routes/faqs.js              ← /related endpoint
+server/routes/answers.js           ← computeConfidence(), confidence stored at submit
+server/routes/users.js             ← /me/profile with questions+answers+savedFAQs
+client/src/services/api.js         ← toggleSaveFAQ, fetchRelatedFAQs, fetchMyProfile
+client/src/context/AuthContext.jsx ← saveFAQ(), isFAQSaved()
+client/src/index.css               ← full modernisation pass
+client/src/components/AccordionItem.jsx  ← heart save button, gradient badge/chevron
+client/src/pages/FAQPage.jsx       ← two-col layout, blobs, RelatedFAQs sidebar
+client/src/pages/QuestionDetailPage.jsx  ← confidence score bars on answers
+client/src/pages/ProfilePage.jsx   ← NEW: full profile UI
+client/src/App.jsx                 ← /profile route
+client/src/components/Navbar.jsx   ← profile link, icon-only logout, mobile profile link
+README.md                          ← updated with all features
+CONTEXT.md                         ← this update
+```
+
+---
+
+✅ **DONE** — User Profile Page with stats, history, and saved FAQs
+✅ **DONE** — Save FAQ (heart toggle, persisted in DB)
+✅ **DONE** — AI Confidence Scores on answers (stored at submit time)
+✅ **DONE** — "People Like You Also Asked" related-FAQ sidebar
+✅ **DONE** — UI Modernisation (gradients, glow, stats cards, animations)
+
+**Still Remaining:**
+1. **Pagination** — Add `?page=` and `?limit=` to list endpoints; add pagination UI
+2. **Admin panel** — Dedicated protected route; role-based moderation; manage FAQs directly (CRUD on FAQ collection)
+3. **Email notifications** — Nodemailer; notify question author when answer is posted
+4. **Rich text editor** — Markdown support for answers (e.g., react-markdown + remark)
+5. **Delete functionality** — Delete questions/answers (currently only status change is supported)
 
 ---
 
@@ -397,4 +556,4 @@ These features were explicitly excluded from the MVP. If the user asks to add th
 
 ---
 
-*Last updated: 2026-06-09 — Session 5 (GitHub readiness: .gitignore, .env.example, clone-and-run README)*
+*Last updated: 2026-06-11 — Session 7 (Profile page, Save FAQs, confidence scores, People-like-you sidebar, UI overhaul)*

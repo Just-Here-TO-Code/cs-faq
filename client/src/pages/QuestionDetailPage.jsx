@@ -2,12 +2,118 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Spinner from '../components/Spinner'
-import { fetchQuestion, fetchAnswers, createAnswer, updateAnswerStatus, updateQuestionStatus } from '../services/api'
+import {
+  fetchQuestion, fetchAnswers, createAnswer,
+  updateAnswerStatus, updateQuestionStatus,
+  fetchSuggestion, upvoteAnswer,
+} from '../services/api'
 import { STATUS_META, CATEGORY_COLORS, timeAgo } from '../utils/constants'
 
 function StatusBadge({ status }) {
   const m = STATUS_META[status] || STATUS_META.pending
   return <span className={`badge ${m.color}`}>{m.label}</span>
+}
+
+// ── AI Suggestion Panel ────────────────────────────────────────────────────────
+function AISuggestionPanel({ questionTitle, questionDesc, onUse }) {
+  const [suggestion,  setSuggestion]  = useState(null)
+  const [basedOn,     setBasedOn]     = useState(null)
+  const [confidence,  setConfidence]  = useState(0)
+  const [loading,     setLoading]     = useState(false)
+  const [fetched,     setFetched]     = useState(false)
+  const [expanded,    setExpanded]    = useState(false)
+
+  async function loadSuggestion() {
+    if (fetched) { setExpanded(e => !e); return }
+    setLoading(true)
+    try {
+      const query = `${questionTitle} ${questionDesc}`
+      const data  = await fetchSuggestion(query)
+      setSuggestion(data.suggestion)
+      setBasedOn(data.basedOn)
+      setConfidence(data.confidence)
+      setFetched(true)
+      setExpanded(true)
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+  }
+
+  const pct = Math.round(confidence * 100)
+
+  return (
+    <div className="mb-5 rounded-2xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/20 overflow-hidden">
+      {/* Header */}
+      <button
+        onClick={loadSuggestion}
+        className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🤖</span>
+          <span className="font-semibold text-violet-700 dark:text-violet-300 text-sm">
+            AI-Powered Suggested Answer
+          </span>
+          {fetched && suggestion && (
+            <span className="badge bg-violet-100 text-violet-600 dark:bg-violet-900/60 dark:text-violet-300 text-[10px]">
+              {pct}% match
+            </span>
+          )}
+        </div>
+        <svg
+          className={`w-4 h-4 text-violet-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+
+      {/* Body */}
+      {expanded && (
+        <div className="px-5 pb-5 animate-fade-in">
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-violet-600 dark:text-violet-400 py-2">
+              <div className="w-4 h-4 rounded-full border-2 border-violet-300 border-t-violet-600 animate-spin"/>
+              Analysing existing FAQs…
+            </div>
+          ) : suggestion ? (
+            <>
+              {/* Confidence bar */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium w-20">Confidence</span>
+                <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                  <div
+                    className="h-2 rounded-full bg-violet-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className="text-xs font-bold text-violet-600 dark:text-violet-400">{pct}%</span>
+              </div>
+
+              {/* Suggested text */}
+              <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed mb-2 whitespace-pre-line">
+                {basedOn?.answer || suggestion}
+              </p>
+
+              {basedOn && (
+                <p className="text-xs text-slate-400 dark:text-slate-500 italic mb-4">
+                  Based on FAQ: &ldquo;{basedOn.question}&rdquo;
+                </p>
+              )}
+
+              <button
+                onClick={() => onUse(basedOn?.answer || suggestion)}
+                className="btn-primary text-xs py-2 px-4"
+              >
+                ✏️ Use this suggestion
+              </button>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-400 py-2">
+              No closely matching FAQ found. Please write a custom answer.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function QuestionDetailPage() {
@@ -25,6 +131,7 @@ export default function QuestionDetailPage() {
   const [answerFilter, setAnswerFilter] = useState('all')
   const [updatingA, setUpdatingA]     = useState({})
   const [updatingQ, setUpdatingQ]     = useState(false)
+  const [upvoting,  setUpvoting]      = useState({})
 
   useEffect(() => {
     fetchQuestion(id)
@@ -74,6 +181,26 @@ export default function QuestionDetailPage() {
       setQuestion(updated)
     } catch { /* silent */ }
     finally { setUpdatingQ(false) }
+  }
+
+  async function handleUpvote(answerId) {
+    if (!user) return
+    setUpvoting(u => ({ ...u, [answerId]: true }))
+    try {
+      const { upvotes, voted } = await upvoteAnswer(answerId)
+      setAnswers(as => as.map(a =>
+        a._id === answerId
+          ? {
+              ...a,
+              upvotes,
+              upvotedBy: voted
+                ? [...(a.upvotedBy || []), user.email]
+                : (a.upvotedBy || []).filter(e => e !== user.email),
+            }
+          : a
+      ))
+    } catch { /* silent */ }
+    finally { setUpvoting(u => ({ ...u, [answerId]: false })) }
   }
 
   if (loadingQ) return <Spinner text="Loading question…"/>
@@ -176,45 +303,82 @@ export default function QuestionDetailPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {displayedAnswers.map((ans, idx) => (
-                <div key={ans._id} className="card p-5 sm:p-6 border-l-4 border-l-primary-400 dark:border-l-primary-600">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-full hero-gradient flex items-center justify-center flex-shrink-0 text-white text-sm font-bold shadow-sm">
-                      {(ans.author || 'A').charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                        <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{ans.author}</span>
-                        <StatusBadge status={ans.status}/>
-                        <span className="text-xs text-slate-400 dark:text-slate-500">{timeAgo(ans.createdAt)}</span>
-                        <span className="badge bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 ml-auto">#{idx + 1}</span>
+              {displayedAnswers.map((ans, idx) => {
+                const hasUpvoted = user && (ans.upvotedBy || []).includes(user.email)
+                const conf = ans.confidence
+                const confColor = conf >= 70 ? 'bg-emerald-500' : conf >= 40 ? 'bg-amber-500' : 'bg-red-400'
+                return (
+                  <div key={ans._id} className="card p-5 sm:p-6 border-l-4 border-l-primary-400 dark:border-l-primary-600 hover:shadow-md transition-shadow duration-200">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-xl hero-gradient flex items-center justify-center flex-shrink-0 text-white text-sm font-bold shadow-sm">
+                        {(ans.author || 'A').charAt(0).toUpperCase()}
                       </div>
-                      <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line">{ans.body}</p>
-                      {/* Answer moderation */}
-                      <div className="flex gap-2 mt-3">
-                        {ans.status !== 'approved' && (
-                          <button onClick={() => changeAnswerStatus(ans._id, 'approved')} disabled={updatingA[ans._id]}
-                            className="btn-success text-[11px] py-1 px-2.5">
-                            {updatingA[ans._id] ? '…' : '✓ Approve'}
-                          </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                          <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{ans.author}</span>
+                          <StatusBadge status={ans.status}/>
+                          <span className="text-xs text-slate-400 dark:text-slate-500">{timeAgo(ans.createdAt)}</span>
+                          <span className="badge bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 ml-auto">#{idx + 1}</span>
+                        </div>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line">{ans.body}</p>
+
+                        {/* Confidence score */}
+                        {conf !== null && conf !== undefined && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 whitespace-nowrap">AI Confidence</span>
+                            <div className="confidence-bar-track flex-1 max-w-[100px]">
+                              <div className={`confidence-bar-fill ${confColor}`} style={{ width: `${conf}%` }}/>
+                            </div>
+                            <span className={`text-[11px] font-bold ${conf >= 70 ? 'text-emerald-600 dark:text-emerald-400' : conf >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400'}`}>
+                              {conf}%
+                            </span>
+                          </div>
                         )}
-                        {ans.status !== 'rejected' && (
-                          <button onClick={() => changeAnswerStatus(ans._id, 'rejected')} disabled={updatingA[ans._id]}
-                            className="btn-danger text-[11px] py-1 px-2.5">
-                            {updatingA[ans._id] ? '…' : '✕ Reject'}
+
+                        {/* Upvote + moderation row */}
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                          {/* Upvote button */}
+                          <button
+                            onClick={() => handleUpvote(ans._id)}
+                            disabled={!user || upvoting[ans._id]}
+                            title={user ? (hasUpvoted ? 'Remove upvote' : 'Upvote this answer') : 'Log in to upvote'}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
+                              hasUpvoted
+                                ? 'bg-primary-100 border-primary-300 text-primary-700 dark:bg-primary-900/40 dark:border-primary-700 dark:text-primary-300'
+                                : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            } ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <svg className="w-3.5 h-3.5" fill={hasUpvoted ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/>
+                            </svg>
+                            {upvoting[ans._id] ? '…' : ans.upvotes || 0}
                           </button>
-                        )}
-                        {ans.status !== 'pending' && (
-                          <button onClick={() => changeAnswerStatus(ans._id, 'pending')} disabled={updatingA[ans._id]}
-                            className="px-2.5 py-1 text-[11px] rounded-xl border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold">
-                            {updatingA[ans._id] ? '…' : '↺ Pending'}
-                          </button>
-                        )}
+
+                          {/* Moderation buttons */}
+                          {ans.status !== 'approved' && (
+                            <button onClick={() => changeAnswerStatus(ans._id, 'approved')} disabled={updatingA[ans._id]}
+                              className="btn-success text-[11px] py-1 px-2.5">
+                              {updatingA[ans._id] ? '…' : '✓ Approve'}
+                            </button>
+                          )}
+                          {ans.status !== 'rejected' && (
+                            <button onClick={() => changeAnswerStatus(ans._id, 'rejected')} disabled={updatingA[ans._id]}
+                              className="btn-danger text-[11px] py-1 px-2.5">
+                              {updatingA[ans._id] ? '…' : '✕ Reject'}
+                            </button>
+                          )}
+                          {ans.status !== 'pending' && (
+                            <button onClick={() => changeAnswerStatus(ans._id, 'pending')} disabled={updatingA[ans._id]}
+                              className="px-2.5 py-1 text-[11px] rounded-xl border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold">
+                              {updatingA[ans._id] ? '…' : '↺ Pending'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -239,6 +403,13 @@ export default function QuestionDetailPage() {
             </div>
           ) : (
             <>
+              {/* AI Suggestion panel — shown inside write-answer section */}
+              <AISuggestionPanel
+                questionTitle={question.title}
+                questionDesc={question.description}
+                onUse={(text) => setForm(f => ({ ...f, body: text }))}
+              />
+
               {submitOk && (
                 <div className="flex items-center gap-2 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-sm mb-4 animate-fade-in">
                   <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

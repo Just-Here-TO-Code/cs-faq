@@ -2,18 +2,82 @@
 
 A crowd-sourced FAQ platform built with the **MERN stack** (MongoDB, Express, React, Node.js) and **Tailwind CSS v3**.
 
-Browse FAQs and community questions without an account. **Sign up or log in** to ask questions and submit answers. Includes dark mode, voting, categories, duplicate detection, and a moderation workflow.
+Browse FAQs and community questions without an account. **Sign up or log in** to ask questions and submit answers. Includes dark mode, voting, categories, duplicate detection, a moderation workflow, AI-powered answer suggestions, and a reputation/leaderboard system.
 
 ---
 
-## Features
-
+## ✨ Features
+### Core
 - **FAQ browser** — search, filter by category, sort by latest / helpful / views, yes/no voting
 - **Community Q&A** — ask questions, view answers, moderation (approve / reject / pending)
 - **Authentication** — JWT login & signup; protected question and answer submission
 - **Dark mode** — toggle with persistence across sessions
-- **Duplicate detection** — warns when similar FAQs or questions already exist
-- **Spam prevention** — one question per account per hour
+
+### Smart Features
+- **Duplicate detection** — warns when similar FAQs or questions already exist before submitting
+- **Spam prevention** — one question per account per hour (server-side enforcement)
+- **Multi-field search** — searches question text, answer text, tags, keywords, and category simultaneously
+- **Sort modes** — sort FAQs by Latest, Most Helpful, or Most Viewed
+
+### Moderation
+- **Question moderation** — Approve / Reject / Mark Pending on any community question
+- **Answer moderation** — Approve / Reject / Mark Pending on any individual answer
+- **Status tabs** — filter questions and answers by status (all / pending / approved / rejected)
+
+### 🤖 AI-Powered Suggested Answers
+- When a logged-in user opens a pending question, an **AI Suggest** panel appears above the answer form
+- Analyses question text against all approved FAQs using keyword-overlap scoring
+- Displays the best-matching FAQ answer with a **confidence percentage bar**
+- Admin/user can click **"Use this suggestion"** to pre-fill the answer textarea
+
+### 🎯 AI Confidence Scores on Answers
+- Every submitted answer receives a computed **confidence score (0–100%)**
+- Score blends: keyword coverage of the question (60%) + alignment with existing FAQ content (40%)
+- Displayed as a colour-coded bar under each answer (🟢 ≥70%, 🟡 ≥40%, 🔴 <40%)
+- Visible on the question detail page and on the user's profile page
+
+### 🏆 Reputation System
+- **Points** awarded for contributions:
+
+  | Action | Points |
+  |--------|--------|
+  | Ask a question | +2 pts |
+  | Submit an answer | +5 pts |
+  | Answer gets approved | +15 pts |
+  | Answer receives an upvote | +10 pts |
+
+- **Levels** based on total points: 🌱 Beginner (0–49) · ⭐ Contributor (50–199) · 🏆 Expert (200+)
+- **Upvote buttons** on each answer (toggle; logged-in users only)
+- **Leaderboard page** (`/leaderboard`) ranks top contributors with progress bars, level badges, and stats
+
+### 👤 User Profile Page
+- Beautiful profile page at `/profile` with gradient banner matching the user's level
+- **Level progress bar** — shows current points and points needed for next level
+- **4-stat grid**: Questions Asked, Answers Given, Answers Approved, Upvotes Received
+- **Tabbed sections**:
+  - ❓ **Questions** — all questions asked, with status badges, links to detail page
+  - 💬 **Answers** — all answers given, with confidence score bars, status, upvote count
+  - ❤️ **Saved FAQs** — all bookmarked FAQs with full content preview
+- Navbar avatar is now a clickable link to the profile page
+
+### ❤️ Save FAQs
+- Heart icon on every FAQ card (visible when logged in)
+- Toggles save/unsave; saved state persisted in database (User model)
+- Saved FAQs appear in the profile page's **Saved FAQs** tab
+
+### 👥 People Like You Also Asked
+- Sidebar panel on the FAQ page that appears when a FAQ is expanded
+- Shows up to 4 related FAQs sharing the same **category** or **tags**
+- On desktop (large screens) as a sticky right rail
+- Login CTA card shown to guests to encourage saving FAQs
+
+### 🎨 Modernised UI
+- `btn-primary` now uses gradient + shadow glow
+- `card-hover` adds lift on hover with shadow transition
+- `stat-card` component for dashboard-style stat tiles
+- `confidence-bar` utility classes for animated progress bars
+- No-scrollbar utility, `glow-primary`, `slide-up` animation
+- FAQ hero has decorative blur blobs and quick-stats bar with progress bars, level badges, and stats
 
 ---
 
@@ -102,7 +166,7 @@ MONGO_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/crowdfaq
 
 ### 4. Seed sample data
 
-Populates the database with 10 sample FAQs:
+Populates the database with 10 sample FAQs (required for AI suggestions to work):
 
 ```bash
 npm run seed
@@ -127,6 +191,8 @@ The Vite dev server proxies `/api/*` to the Express server, so no extra CORS set
 2. Go to **Log In** → **Sign Up** to create an account
 3. Visit **Ask Question** to submit a community question
 4. Open **Community** to view and moderate questions
+5. Click a question → answer it → see the 🤖 AI suggestion panel
+6. Check **🏆 Leaderboard** to see top contributors
 
 ---
 
@@ -145,12 +211,12 @@ crowdfaq/
 │   ├── .env.example          # Template — copy to .env (not committed)
 │   ├── middleware/auth.js
 │   ├── models/               # User, FAQ, Question, Answer
-│   └── routes/               # auth, faqs, questions, answers
+│   └── routes/               # auth, faqs, questions, answers, users, suggest
 │
 └── client/                   # React + Vite frontend
     ├── vite.config.js        # Dev proxy: /api → localhost:5000
     └── src/
-        ├── pages/            # FAQ, Auth, Ask, Community, Detail
+        ├── pages/            # FAQ, Auth, Ask, Community, Detail, Leaderboard
         ├── components/
         ├── context/          # Theme + Auth providers
         └── services/api.js
@@ -176,11 +242,13 @@ Run all commands from the **project root**:
 
 | Route | Auth | Description |
 |-------|------|-------------|
-| `/` | No | FAQ page with search, filters, voting |
+| `/` | No | FAQ page with search, filters, voting, People-like-you sidebar |
 | `/auth` | No | Login & signup |
 | `/ask` | Yes | Submit a community question |
 | `/community` | No | Browse questions with moderation tabs |
-| `/community/:id` | No (answer: Yes) | Question detail + answers |
+| `/community/:id` | No (answer: Yes) | Question detail + answers + confidence scores + AI suggestion |
+| `/leaderboard` | No | Top contributors ranked by reputation points |
+| `/profile` | Yes | Personal profile: stats, questions, answers, saved FAQs |
 
 ---
 
@@ -194,9 +262,13 @@ Run all commands from the **project root**:
 | `GET` | `/api/faqs` | No | List FAQs (`?search`, `?category`, `?sort`) |
 | `POST` | `/api/faqs/:id/vote` | No | Vote helpful / not helpful |
 | `GET` | `/api/questions` | No | List community questions |
-| `POST` | `/api/questions` | Yes | Create question |
+| `POST` | `/api/questions` | Yes | Create question (+2 pts) |
 | `GET` | `/api/answers/:questionId` | No | List answers |
-| `POST` | `/api/answers` | Yes | Submit answer |
+| `POST` | `/api/answers` | Yes | Submit answer (+5 pts) |
+| `PATCH` | `/api/answers/:id/status` | No | Approve answer (+15 pts to author) |
+| `POST` | `/api/answers/:id/upvote` | Yes | Toggle upvote (+10 pts to author) |
+| `GET` | `/api/suggest?q=` | No | AI-suggested answer from FAQ data |
+| `GET` | `/api/users/leaderboard` | No | Top contributors by points |
 | `GET` | `/api/health` | No | Health check |
 
 ---
@@ -210,6 +282,7 @@ Run all commands from the **project root**:
 | `Port 3000 already in use` | Change `server.port` in `client/vite.config.js` |
 | `401` when posting questions | Log in first — auth token is required |
 | Empty FAQ page | Run `npm run seed` to populate sample data |
+| AI suggestion returns nothing | The seeded FAQs need to match some keywords; try questions about eligibility, stipend, certificates, etc. |
 | `npm install` fails | Use Node.js v18+; delete `node_modules` folders and retry |
 
 ---
